@@ -3,8 +3,10 @@ const session = require('express-session');
 const crypto = require('crypto');
 const authRoute = require('./routes/authRoutes');
 const userRoute = require('./routes/userRoutes');
+const frontRoute = require('./routes/frontRoutes');
 const connection = require('./db');
 const rateLimit = require('express-rate-limit');
+const {checkUser} = require('./middlewares/authMiddleware')
 
 
 const app = express();
@@ -26,7 +28,9 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
-
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.set('view engine', 'ejs');
 
 
 connection.connect(function(err) {
@@ -57,32 +61,12 @@ connection.connect(function(err) {
   connection.query(createPasswordResetTableSQL);
 });
 
-
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.set('view engine', 'ejs');
-
-
-function isAuthenticated(req, res, next) {
-  if (req.session.userId) {
-    // User is authenticated, allow access to the route
-    return next();
-  }
-  // User is not authenticated, redirect to the login page or show an error message
-  res.redirect('/login'); // You can customize this redirection as needed
-}
-
-app.get('/', (req, res) => {
-  res.render('home');
-})
-
-app.get('/blog', isAuthenticated, (req, res) => {
-  // Render the blog page for authenticated users
-  res.send('blog page')
-});
-
+// Routes
+app.get('*', checkUser);
+app.get('/', (req, res) => {res.render('home');});
 app.use(authRoute);
 app.use(userRoute);
+app.use(frontRoute);
 
 
-app.listen(3000)
+app.listen(3000);
