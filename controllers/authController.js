@@ -9,29 +9,48 @@ const register_get = (req, res) => {
 const register_post = (req, res) => {
   const { username, email, password } = req.body;
 
-  let error = null;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  if (!username || !email || !password) {
-    error = 'All fields are required.';
-  } else if (password.length < 8) {
-    error = 'Password must be at least 8 characters long.';
-  } else if (!emailRegex.test(email)) {
-    error = 'Invalid email format.';
-  }
+  // Check if the username already exists
+  connection.query('SELECT * FROM users WHERE username = ?', [username], (usernameError, usernameResults) => {
+    if (usernameError) {
+      throw usernameError;
+    }
 
-  if (error) {
-    res.render('register', { error });
-  }
+    // Check if the email already exists
+    connection.query('SELECT * FROM users WHERE email = ?', [email], (emailError, emailResults) => {
+      if (emailError) {
+        throw emailError;
+      }
 
-  const hashedPassword = bcrypt.hashSync(password, 10);
+      if (usernameResults.length > 0) {
+        // Username is duplicated
+        res.render('register', { error: 'Username already exists.' });
+      } else if (emailResults.length > 0) {
+        // Email is duplicated
+        res.render('register', { error: 'Email already exists.' });
+      } else {
+        // Both username and email are unique, proceed with user registration
+        const hashedPassword = bcrypt.hashSync(password, 10);
 
-  const user = { username, email, password: hashedPassword };
-  connection.query('INSERT INTO users SET ?', user, (error, results) => {
-    if (error) throw error;
-    res.status(201).send('User registered successfully.');
+        const user = { username, email, password: hashedPassword };
+        connection.query('INSERT INTO users SET ?', user, (insertError, insertResults) => {
+          if (insertError) {
+            throw insertError;
+          }
+
+          res.render('display', {
+            message: '<h1>Account created successfully</h1><a class="btn" href="/login">Login</a>',
+          });
+        });
+      }
+    });
   });
-}
+};
+
+
+
+// res.render('display', {message: `<h1>account created successfully</h1><a href="/login">login</a>`});
 
 const login_get = (req, res) => {
   res.render('login', { error: null });
@@ -51,7 +70,7 @@ const login_post = (req, res) => {
     const user = results[0];
     if (bcrypt.compareSync(password, user.password)) {
       req.session.userId = user.id;
-      res.send('Logged in successfully.');
+      res.render('dashboard');
     } else {
       res.render('login', {error: 'Invalid password.'});
     }
@@ -60,7 +79,7 @@ const login_post = (req, res) => {
 
 const logout_get = (req, res) => {
   req.session.destroy();
-  res.send('Logged out successfully.');
+  res.render('login', {error: null});
 }
 
 module.exports = {
