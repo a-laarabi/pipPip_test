@@ -19,7 +19,7 @@ const sendResetEmail_post = async(req, res) => {
 
   const resetLink = `http://localhost:3000/reset-password?token=${resetToken}`;
   const mailOptions = {
-    from: 'ana.laara3@gmail.com',
+    from: `${process.env.NODEMAILER_USER}`,
     to: email,
     subject: 'Password Reset Request',
     html: `
@@ -36,16 +36,13 @@ const sendResetEmail_post = async(req, res) => {
     if (userId !== null) {
       await storeResetTokenInDatabase(userId, resetToken);
 
-      // res.send('Password reset instructions sent to your email.');
       res.render('display', {message: `<h1>Password reset</h1><p>Instructions sent to your email.</p>`});
     } else {
-      // res.send('No user found with the provided email.');
       res.render('display', {message: `<p>No user found with the provided email.</p>`});
     }
   } catch (error) {
     console.error('Email sending error:', error);
     res.status(500).render('display', {message:`<p>Error sending the reset email.</p>`})
-    // .send('Error sending the reset email.');
   }
 }
 

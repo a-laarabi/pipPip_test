@@ -11,46 +11,53 @@ const register_post = (req, res) => {
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // Check if the username already exists
+  let error = null;
+
+  if (!username || !email || !password) {
+    error = 'All fields are required.';
+  } else if (password.length < 8) {
+    error = 'Password must be at least 8 characters long.';
+  } else if (!emailRegex.test(email)) {
+    error = 'Invalid email format.';
+  }
+
+  if (error) {
+    res.render('register', { error });
+    return;
+  }
+
   connection.query('SELECT * FROM users WHERE username = ?', [username], (usernameError, usernameResults) => {
     if (usernameError) {
       throw usernameError;
     }
+    if (usernameResults.length > 0) {
+      res.render('register', { error: 'Username already exists.' });
+    } else {
+      connection.query('SELECT * FROM users WHERE email = ?', [email], (emailError, emailResults) => {
+        if (emailError) {
+          throw emailError;
+        }
 
-    // Check if the email already exists
-    connection.query('SELECT * FROM users WHERE email = ?', [email], (emailError, emailResults) => {
-      if (emailError) {
-        throw emailError;
-      }
+        if (emailResults.length > 0) {
+          res.render('register', { error: 'Email already exists.' });
+        } else {
+          const hashedPassword = bcrypt.hashSync(password, 10);
 
-      if (usernameResults.length > 0) {
-        // Username is duplicated
-        res.render('register', { error: 'Username already exists.' });
-      } else if (emailResults.length > 0) {
-        // Email is duplicated
-        res.render('register', { error: 'Email already exists.' });
-      } else {
-        // Both username and email are unique, proceed with user registration
-        const hashedPassword = bcrypt.hashSync(password, 10);
+          const user = { username, email, password: hashedPassword };
+          connection.query('INSERT INTO users SET ?', user, (insertError, insertResults) => {
+            if (insertError) {
+              throw insertError;
+            }
 
-        const user = { username, email, password: hashedPassword };
-        connection.query('INSERT INTO users SET ?', user, (insertError, insertResults) => {
-          if (insertError) {
-            throw insertError;
-          }
-
-          res.render('display', {
-            message: '<h1>Account created successfully</h1><a class="btn" href="/login">Login</a>',
+            res.render('display', {
+              message: '<h1>Account created successfully</h1><a class="btn" href="/login">Login</a>',
+            });
           });
-        });
-      }
-    });
+        }
+      });
+    }
   });
 };
-
-
-
-// res.render('display', {message: `<h1>account created successfully</h1><a href="/login">login</a>`});
 
 const login_get = (req, res) => {
   res.render('login', { error: null });
